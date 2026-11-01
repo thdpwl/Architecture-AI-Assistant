@@ -97,6 +97,10 @@
     .dxf-status.error { color: #b54444; }
     .dxf-results { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
     .dxf-results.visible { display: block; }
+    #dxfResultContent { display: none; }
+    .dxf-results.has-results #dxfResultContent { display: block; }
+    .dxf-results.has-results #dxfEmptyState { display: none; }
+    .dxf-empty { margin: 0; padding: 18px; color: var(--muted); background: #f8faff; border: 1px solid #edf0f6; border-radius: 9px; text-align: center; font-size: 10px; line-height: 1.6; }
     .result-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 11px; }
     .result-head strong { overflow-wrap: anywhere; font-size: 11px; }
     .result-head span { color: var(--muted); font-size: 9px; }
@@ -281,18 +285,21 @@
           </div>
           <div class="sample-action"><button class="sample-button" id="loadExample" type="button">이슈 #3 예시 평면도 분석</button><span class="sample-caption">제공된 도면에서 작성자·위치 정보 등 파일 메타데이터를 제외한 예시</span></div>
           <p class="dxf-status" id="dxfStatus" role="status" aria-live="polite">레이어 이름과 객체 수를 확인하고 주요 도형을 미리 볼 수 있습니다.</p>
-          <div class="dxf-results" id="dxfResults">
-            <div class="result-head"><strong id="dxfFileName"></strong><span id="dxfSummary"></span></div>
-            <div class="semantic-summary" id="semanticSummary" aria-label="도면 요소별 의미"></div>
-            <p class="semantic-hint">요소를 선택하면 도면에서 해당 레이어를 강조합니다. 분류는 알려진 레이어 이름에 따른 표시이며 AI 인식이나 설계 판정이 아닙니다.</p>
-            <div class="dxf-result-grid">
-              <div class="drawing-preview" id="drawingPreview" role="img" aria-label="DXF 도면 미리보기"></div>
-              <div class="layer-table-wrap">
-                <table class="layer-table"><thead><tr><th scope="col">레이어</th><th scope="col">도면 의미</th><th scope="col">색상</th><th scope="col">요소</th></tr></thead><tbody id="layerRows"></tbody></table>
+          <div class="dxf-results visible" id="dxfResults">
+            <p class="dxf-empty" id="dxfEmptyState">DXF 분석 결과가 여기에 표시됩니다. 예시 평면도를 불러오거나 파일을 선택해 주세요.</p>
+            <div id="dxfResultContent">
+              <div class="result-head"><strong id="dxfFileName"></strong><span id="dxfSummary"></span></div>
+              <div class="semantic-summary" id="semanticSummary" aria-label="도면 요소별 의미"></div>
+              <p class="semantic-hint">요소를 선택하면 도면에서 해당 레이어를 강조합니다. 분류는 알려진 레이어 이름에 따른 표시이며 AI 인식이나 설계 판정이 아닙니다.</p>
+              <div class="dxf-result-grid">
+                <div class="drawing-preview" id="drawingPreview" role="img" aria-label="DXF 도면 미리보기"></div>
+                <div class="layer-table-wrap">
+                  <table class="layer-table"><thead><tr><th scope="col">레이어</th><th scope="col">도면 의미</th><th scope="col">색상</th><th scope="col">요소</th></tr></thead><tbody id="layerRows"></tbody></table>
+                </div>
               </div>
+              <div class="entity-summary" id="entitySummary"></div>
+              <p class="semantic-note">요소 수는 레이어에 저장된 CAD 엔티티 수입니다. 벽·기둥 등 실제 부재 개수와 동일하지 않을 수 있으며, 미분류 레이어는 별도 확인이 필요합니다.</p>
             </div>
-            <div class="entity-summary" id="entitySummary"></div>
-            <p class="semantic-note">요소 수는 레이어에 저장된 CAD 엔티티 수입니다. 벽·기둥 등 실제 부재 개수와 동일하지 않을 수 있으며, 미분류 레이어는 별도 확인이 필요합니다.</p>
           </div>
           <p class="dxf-limit">미리보기 지원: LINE, LWPOLYLINE, CIRCLE, ARC. 이 결과는 기본 도면 정보이며 건설CALS/EC 표준 적합성이나 건축 설계·법규 검토 판정이 아닙니다.</p>
         </section>
@@ -394,7 +401,6 @@
       dxfFile.click();
     });
     document.getElementById("loadExample").addEventListener("click", async () => {
-      dxfResults.classList.remove("visible");
       dxfStatus.classList.remove("error");
       dxfStatus.textContent = "이슈 #3 예시 도면을 불러오고 있습니다...";
       try {
@@ -449,7 +455,6 @@
     }
 
     async function analyzeDxfFile(file) {
-      dxfResults.classList.remove("visible");
       dxfStatus.classList.remove("error");
       if (!file.name.toLowerCase().endsWith(".dxf")) {
         dxfStatus.textContent = "DXF 파일(.dxf)만 선택할 수 있습니다.";
@@ -533,7 +538,7 @@
         summary.append(chip);
       }
       renderDrawing(result.primitives);
-      dxfResults.classList.add("visible");
+      dxfResults.classList.add("has-results");
     }
 
     function renderSemanticSummary(result) {
@@ -665,6 +670,8 @@
         preview.append(note);
       }
     }
+
+    document.getElementById("loadExample").click();
   </script>
 </body>
 </html>
