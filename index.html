@@ -87,6 +87,10 @@
     .drop-zone p { margin: 0; font-size: 9px; }
     .upload-button { margin-top: 3px; padding: 8px 12px; color: white; background: var(--blue); border: 0; border-radius: 7px; font-size: 10px; font-weight: 700; }
     .upload-button:hover { background: #3457d1; }
+    .sample-action { display: flex; align-items: center; gap: 10px; margin-top: 10px; }
+    .sample-button { padding: 8px 11px; color: #536cb8; background: #f3f5ff; border: 1px solid #e1e7ff; border-radius: 7px; font-size: 10px; font-weight: 700; }
+    .sample-button:hover { background: #e9edff; }
+    .sample-caption { color: var(--muted); font-size: 9px; line-height: 1.5; }
     .file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
     .file-input:focus-visible + .drop-zone .upload-button { outline: 3px solid #9aacef; outline-offset: 3px; }
     .dxf-status { min-height: 16px; margin: 9px 0 0; color: var(--muted); font-size: 10px; }
@@ -263,6 +267,7 @@
             <p>텍스트 DXF · 최대 20MB · 파일 내용은 업로드되지 않습니다</p>
             <button class="upload-button" id="chooseDxf" type="button">파일 선택</button>
           </div>
+          <div class="sample-action"><button class="sample-button" id="loadExample" type="button">이슈 #3 예시 평면도 분석</button><span class="sample-caption">제공된 도면에서 작성자·위치 정보 등 파일 메타데이터를 제외한 예시</span></div>
           <p class="dxf-status" id="dxfStatus" role="status" aria-live="polite">레이어 이름과 객체 수를 확인하고 주요 도형을 미리 볼 수 있습니다.</p>
           <div class="dxf-results" id="dxfResults">
             <div class="result-head"><strong id="dxfFileName"></strong><span id="dxfSummary"></span></div>
@@ -373,6 +378,20 @@
       event.stopPropagation();
       dxfFile.click();
     });
+    document.getElementById("loadExample").addEventListener("click", async () => {
+      dxfResults.classList.remove("visible");
+      dxfStatus.classList.remove("error");
+      dxfStatus.textContent = "이슈 #3 예시 도면을 불러오고 있습니다...";
+      try {
+        const response = await fetch("examples/issue-3-commercial-floorplan.dxf");
+        if (!response.ok) throw new Error(`예시 도면을 가져오지 못했습니다 (HTTP ${response.status}).`);
+        const file = new File([await response.arrayBuffer()], "issue-3-commercial-floorplan.dxf", { type: "application/dxf" });
+        await analyzeDxfFile(file);
+      } catch (error) {
+        dxfStatus.textContent = error.message;
+        dxfStatus.classList.add("error");
+      }
+    });
     dropZone.addEventListener("click", () => dxfFile.click());
     dropZone.addEventListener("keydown", (event) => {
       if (event.key === "Enter" || event.key === " ") {
@@ -442,8 +461,18 @@
 
     function renderDxfResult(fileName, result) {
       document.getElementById("dxfFileName").textContent = fileName;
+      const units = { 1: "in", 2: "ft", 3: "mi", 4: "mm", 5: "cm", 6: "m", 7: "km" };
+      const unit = units[result.unitsCode] || "도면 단위";
+      const width = result.bounds?.width ?? 0;
+      const height = result.bounds?.height ?? 0;
+      const dimensionScale = result.unitsCode === 4 ? 1000 : result.unitsCode === 5 ? 100 : 1;
+      const dimensionUnit = result.unitsCode === 4 || result.unitsCode === 5 ? "m" : unit;
+      const formatDimension = (value) => (value / dimensionScale).toLocaleString("ko-KR", { maximumFractionDigits: 1 });
+      const dimensions = result.bounds
+        ? `도면 범위 ${formatDimension(width)} × ${formatDimension(height)} ${dimensionUnit}`
+        : "도면 범위를 계산할 수 없음";
       document.getElementById("dxfSummary").textContent =
-        `레이어 ${result.layers.length}개 · 전체 객체 ${result.entityCount.toLocaleString()}개`;
+        `레이어 ${result.layers.length}개 · 객체 ${result.entityCount.toLocaleString()}개 · ${dimensions}`;
 
       const layerRows = document.getElementById("layerRows");
       layerRows.replaceChildren();

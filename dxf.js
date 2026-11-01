@@ -97,6 +97,74 @@
     return null;
   }
 
+  function transformGeometry(geometry, block, insert) {
+    const scaleX = firstValue(insert, 41) ?? 1;
+    const scaleY = firstValue(insert, 42) ?? 1;
+    const angle = (firstValue(insert, 50) || 0) * (Math.PI / 180);
+    const cosine = Math.cos(angle);
+    const sine = Math.sin(angle);
+    const offsetX = firstValue(insert, 10) ?? 0;
+    const offsetY = firstValue(insert, 20) ?? 0;
+
+    function transformPoint(point) {
+      const x = (point[0] - block.base[0]) * scaleX;
+      const y = (point[1] - block.base[1]) * scaleY;
+      return [offsetX + x * cosine - y * sine, offsetY + x * sine + y * cosine];
+    }
+
+    if (geometry.type === "circle" && Math.abs(Math.abs(scaleX) - Math.abs(scaleY)) < 1e-8) {
+      return {
+        type: "circle",
+        center: transformPoint(geometry.center),
+        radius: geometry.radius * Math.abs(scaleX)
+      };
+    }
+
+    const points = geometry.type === "circle"
+      ? Array.from({ length: 49 }, (_, index) => {
+        const angle = (index / 48) * Math.PI * 2;
+        return [
+          geometry.center[0] + geometry.radius * Math.cos(angle),
+          geometry.center[1] + geometry.radius * Math.sin(angle)
+        ];
+      })
+      : geometry.points;
+    const transformedPoints = points.map(transformPoint);
+    if (geometry.type === "line") return { type: "line", points: transformedPoints };
+    return {
+      type: "polyline",
+      points: transformedPoints,
+      closed: geometry.type === "circle" || (geometry.type === "polyline" && geometry.closed)
+    };
+  }
+
+  function geometryBounds(primitives) {
+    let minX = Infinity;
+    let maxX = -Infinity;
+    let minY = Infinity;
+    let maxY = -Infinity;
+    function include(x, y) {
+      minX = Math.min(minX, x);
+      maxX = Math.max(maxX, x);
+      minY = Math.min(minY, y);
+      maxY = Math.max(maxY, y);
+    }
+
+    for (const primitive of primitives) {
+      if (primitive.type === "circle") {
+        const [x, y] = primitive.center;
+        include(x - primitive.radius, y - primitive.radius);
+        include(x + primitive.radius, y + primitive.radius);
+      } else {
+        for (const [x, y] of primitive.points) include(x, y);
+      }
+    }
+
+    return Number.isFinite(minX)
+      ? { minX, minY, maxX, maxY, width: maxX - minX, height: maxY - minY }
+      : null;
+  }
+
   function parseDxf(text) {
     if (typeof text !== "string" || !text.trim()) throw new Error("DXF 파일이 비어 있습니다.");
     if (text.startsWith("AutoCAD Binary DXF")) {
@@ -107,7 +175,10 @@
     const layers = new Map();
     const entityCounts = new Map();
     const primitives = [];
+    const blocks = new Map();
     let section = null;
+    let activeBlock = null;
+    let unitsCode = null;
     let entityCount = 0;
     let sawSection = false;
 
@@ -123,6 +194,11 @@
       }
       if (pair.code === 0 && pair.value === "ENDSEC") {
         section = null;
+        activeBlock = null;
+        continue;
+      }
+      if (section === "HEADER" && pair.code === 9 && pair.value === "$INSUNITS") {
+        unitsCode = numeric(pairs[i + 1]?.value);
         continue;
       }
       if (pair.code !== 0 || !section) continue;
@@ -130,6 +206,28 @@
       const record = [];
       for (let j = i + 1; j < pairs.length && pairs[j].code !== 0; j += 1) {
         record.push(pairs[j]);
+      }
+
+      if (section === "BLOCKS" && pair.value === "BLOCK") {
+        const name = record.find((item) => item.code === 2)?.value;
+        if (name) {
+          activeBlock = {
+            name,
+            base: [firstValue(record, 10) ?? 0, firstValue(record, 20) ?? 0],
+            primitives: []
+          };
+          blocks.set(name, activeBlock);
+        }
+      } else if (section === "BLOCKS" && pair.value === "ENDBLK") {
+        activeBlock = null;
+      } else if (section === "BLOCKS" && activeBlock) {
+        const geometry = entityGeometry(pair.value.toUpperCase(), record);
+        if (geometry) {
+          activeBlock.primitives.push({
+            geometry,
+            layer: record.find((item) => item.code === 8)?.value || "0"
+          });
+        }
       }
 
       if (section === "TABLES" && pair.value === "LAYER") {
@@ -158,6 +256,18 @@
 
         const geometry = entityGeometry(type, record);
         if (geometry) primitives.push({ ...geometry, layer });
+        if (type === "INSERT") {
+          const block = blocks.get(record.find((item) => item.code === 2)?.value);
+          if (block) {
+            for (const member of block.primitives) {
+              const transformed = transformGeometry(member.geometry, block, record);
+              primitives.push({
+                ...transformed,
+                layer: member.layer === "0" ? layer : member.layer
+              });
+            }
+          }
+        }
       }
     }
 
@@ -166,6 +276,8 @@
       layers: [...layers.values()].sort((a, b) => a.name.localeCompare(b.name)),
       entityCounts: [...entityCounts.entries()].sort((a, b) => a[0].localeCompare(b[0])),
       entityCount,
+      unitsCode,
+      bounds: geometryBounds(primitives),
       primitives
     };
   }
