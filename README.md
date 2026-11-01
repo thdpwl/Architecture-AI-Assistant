@@ -4,7 +4,7 @@
 
 ## GitHub Pages
 
-저장소의 **Settings → Pages → Build and deployment → Source**를 **GitHub Actions**로 설정하면 `main` 브랜치에 반영할 때 정적 사이트가 배포됩니다. 배포가 완료되면 Pages 주소는 저장소의 Pages 설정에서 확인할 수 있습니다.
+이 저장소는 GitHub Pages의 **Deploy from a branch** 방식으로 `main` 브랜치의 루트(`/`)를 배포합니다. 변경사항을 `main`에 반영하면 Pages가 자동으로 다시 빌드합니다. 공개 주소는 https://thdpwl.github.io/Architecture-AI-Assistant/ 입니다.
 
 ## 현재 프로토타입
 
