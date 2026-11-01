@@ -100,6 +100,15 @@
     .result-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 11px; }
     .result-head strong { overflow-wrap: anywhere; font-size: 11px; }
     .result-head span { color: var(--muted); font-size: 9px; }
+    .semantic-summary { display: grid; grid-template-columns: repeat(auto-fit, minmax(155px, 1fr)); gap: 8px; margin-bottom: 12px; }
+    .semantic-filter { display: flex; align-items: flex-start; gap: 8px; width: 100%; padding: 10px; color: var(--ink); background: white; border: 1px solid var(--line); border-radius: 9px; text-align: left; transition: .15s ease; }
+    .semantic-filter:hover, .semantic-filter.active { background: #f8faff; border-color: #9eaff2; box-shadow: 0 0 0 2px #edf1ff; }
+    .semantic-filter:not(.active) { opacity: .7; }
+    .semantic-swatch { flex: none; width: 9px; height: 9px; margin-top: 3px; border-radius: 50%; }
+    .semantic-filter strong { display: block; font-size: 10px; }
+    .semantic-filter small { display: block; margin-top: 4px; color: var(--muted); font-size: 9px; line-height: 1.45; }
+    .semantic-filter em { display: block; margin-top: 4px; color: #536cb8; font-size: 9px; font-style: normal; font-weight: 700; }
+    .semantic-hint { margin: 0 0 9px; color: var(--muted); font-size: 9px; }
     .dxf-result-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, .8fr); gap: 12px; }
     .drawing-preview { display: grid; place-items: center; min-height: 210px; overflow: hidden; background: #f8faff; border: 1px solid #edf0f6; border-radius: 9px; }
     .drawing-preview svg { display: block; width: 100%; height: 100%; min-height: 210px; max-height: 400px; }
@@ -109,9 +118,12 @@
     .layer-table th, .layer-table td { padding: 8px 9px; border-bottom: 1px solid #eff1f5; font-size: 9px; }
     .layer-table th { position: sticky; top: 0; color: #758198; background: #f8f9fc; font-weight: 600; }
     .layer-table td:first-child { max-width: 180px; overflow-wrap: anywhere; color: #46546b; }
-    .layer-table td:last-child, .layer-table th:last-child { text-align: right; }
+    .layer-table td:last-child, .layer-table th:last-child { text-align: right; white-space: nowrap; }
+    .layer-meaning { display: flex; align-items: center; gap: 6px; min-width: 120px; }
+    .layer-meaning .semantic-swatch { width: 7px; height: 7px; margin-top: 0; }
     .entity-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
     .entity-chip { padding: 5px 7px; color: #526bc6; background: #f0f3ff; border-radius: 20px; font-size: 9px; }
+    .semantic-note { margin: 9px 0 0; color: #7e899b; font-size: 9px; line-height: 1.6; }
     .dxf-limit { margin: 10px 0 0; color: #7e899b; font-size: 9px; line-height: 1.6; }
     .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-top: 17px; }
     .stat { display: flex; align-items: center; gap: 12px; padding: 15px; background: white; border: 1px solid var(--line); border-radius: 12px; }
@@ -172,7 +184,7 @@
       .sidebar { position: fixed; z-index: 4; inset: auto 0 0; display: block; width: 100%; height: auto; padding: 7px 9px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); border-right: 0; }
       .brand, .nav-label, .side-bottom { display: none; }
       .nav { display: flex; justify-content: space-around; gap: 2px; }
-      .nav button { display: grid; justify-items: center; gap: 4px; width: 25%; padding: 7px 3px; font-size: 9px; }
+      .nav button { display: grid; justify-items: center; gap: 4px; width: 20%; padding: 7px 3px; font-size: 9px; }
       .nav svg { width: 17px; height: 17px; }
       main { padding: 19px 16px 98px; }
       .topbar { margin-bottom: 25px; }
@@ -258,7 +270,7 @@
 
         <section class="dxf-panel" id="dxf" aria-labelledby="dxfTitle">
           <div class="section-heading">
-            <div><h2 id="dxfTitle">DXF 도면 빠른 분석</h2><p>파일은 이 브라우저에서만 처리되며 서버로 전송되지 않습니다.</p></div>
+            <div><h2 id="dxfTitle">DXF 도면 요소 분석</h2><p>이슈 #5의 레이어 기준으로 문·벽체·기둥·마감재를 색으로 구분합니다.</p></div>
           </div>
           <input class="file-input" id="dxfFile" type="file" accept=".dxf,application/dxf" aria-label="분석할 DXF 파일 선택">
           <div class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="DXF 파일을 선택하거나 이 영역에 끌어다 놓으세요">
@@ -271,13 +283,16 @@
           <p class="dxf-status" id="dxfStatus" role="status" aria-live="polite">레이어 이름과 객체 수를 확인하고 주요 도형을 미리 볼 수 있습니다.</p>
           <div class="dxf-results" id="dxfResults">
             <div class="result-head"><strong id="dxfFileName"></strong><span id="dxfSummary"></span></div>
+            <div class="semantic-summary" id="semanticSummary" aria-label="도면 요소별 의미"></div>
+            <p class="semantic-hint">요소를 선택하면 도면에서 해당 레이어를 강조합니다. 분류는 알려진 레이어 이름에 따른 표시이며 AI 인식이나 설계 판정이 아닙니다.</p>
             <div class="dxf-result-grid">
               <div class="drawing-preview" id="drawingPreview" role="img" aria-label="DXF 도면 미리보기"></div>
               <div class="layer-table-wrap">
-                <table class="layer-table"><thead><tr><th scope="col">레이어</th><th scope="col">색상</th><th scope="col">객체</th></tr></thead><tbody id="layerRows"></tbody></table>
+                <table class="layer-table"><thead><tr><th scope="col">레이어</th><th scope="col">도면 의미</th><th scope="col">색상</th><th scope="col">요소</th></tr></thead><tbody id="layerRows"></tbody></table>
               </div>
             </div>
             <div class="entity-summary" id="entitySummary"></div>
+            <p class="semantic-note">요소 수는 레이어에 저장된 CAD 엔티티 수입니다. 벽·기둥 등 실제 부재 개수와 동일하지 않을 수 있으며, 미분류 레이어는 별도 확인이 필요합니다.</p>
           </div>
           <p class="dxf-limit">미리보기 지원: LINE, LWPOLYLINE, CIRCLE, ARC. 이 결과는 기본 도면 정보이며 건설CALS/EC 표준 적합성이나 건축 설계·법규 검토 판정이 아닙니다.</p>
         </section>
@@ -372,7 +387,7 @@
     const dxfResults = document.getElementById("dxfResults");
     const svgNamespace = "http://www.w3.org/2000/svg";
     const maxFileSize = 20 * 1024 * 1024;
-    const layerColors = ["#4268e8", "#23876b", "#d38529", "#8556bc", "#d04f63", "#287e9d", "#738096"];
+    let activeSemanticFilter = null;
 
     document.getElementById("chooseDxf").addEventListener("click", (event) => {
       event.stopPropagation();
@@ -479,23 +494,36 @@
       for (const layer of result.layers) {
         const row = document.createElement("tr");
         const name = document.createElement("td");
+        const meaning = document.createElement("td");
         const color = document.createElement("td");
         const count = document.createElement("td");
         name.textContent = layer.name;
+        const meaningContent = document.createElement("span");
+        const swatch = document.createElement("span");
+        swatch.className = "semantic-swatch";
+        swatch.style.backgroundColor = layer.semanticColor;
+        const label = document.createElement("span");
+        label.textContent = layer.label;
+        meaningContent.className = "layer-meaning";
+        meaningContent.title = layer.description;
+        meaningContent.append(swatch, label);
+        meaning.append(meaningContent);
         color.textContent = layer.color === null ? "기본" : String(layer.color);
         count.textContent = layer.count.toLocaleString();
-        row.append(name, color, count);
+        row.append(name, meaning, color, count);
         layerRows.append(row);
       }
       if (result.layers.length === 0) {
         const row = document.createElement("tr");
         const cell = document.createElement("td");
-        cell.colSpan = 3;
+        cell.colSpan = 4;
         cell.textContent = "레이어 정보가 없습니다.";
         row.append(cell);
         layerRows.append(row);
       }
 
+      activeSemanticFilter = null;
+      renderSemanticSummary(result);
       const summary = document.getElementById("entitySummary");
       summary.replaceChildren();
       for (const [type, count] of result.entityCounts) {
@@ -508,18 +536,76 @@
       dxfResults.classList.add("visible");
     }
 
+    function renderSemanticSummary(result) {
+      const summary = document.getElementById("semanticSummary");
+      summary.replaceChildren();
+      const semanticLayers = result.layers.filter((layer) =>
+        layer.key !== "other" || layer.count > 0 || result.primitives.some((primitive) => primitive.layer === layer.name)
+      );
+      const categories = [...new Map(semanticLayers.map((layer) => [layer.key, layer])).values()];
+      const totalCadEntities = result.layers.reduce((total, layer) => total + layer.count, 0);
+
+      function addFilter(label, detail, color, key, description = "") {
+        const button = document.createElement("button");
+        button.className = "semantic-filter";
+        button.type = "button";
+        button.dataset.semantic = key;
+        button.setAttribute("aria-pressed", String(activeSemanticFilter === key || (key === "all" && activeSemanticFilter === null)));
+        if (activeSemanticFilter === key || (key === "all" && activeSemanticFilter === null)) button.classList.add("active");
+        const swatch = document.createElement("span");
+        swatch.className = "semantic-swatch";
+        swatch.style.backgroundColor = color;
+        const text = document.createElement("span");
+        const heading = document.createElement("strong");
+        heading.textContent = label;
+        const detailText = document.createElement("small");
+        detailText.textContent = description || detail;
+        text.append(heading, detailText);
+        if (description) {
+          const count = document.createElement("em");
+          count.textContent = detail;
+          text.append(count);
+        }
+        button.append(swatch, text);
+        button.addEventListener("click", () => {
+          activeSemanticFilter = key === "all" || activeSemanticFilter === key ? null : key;
+          renderSemanticSummary(result);
+          renderDrawing(result.primitives);
+        });
+        summary.append(button);
+      }
+
+      addFilter("전체 도면", `CAD 요소 ${totalCadEntities.toLocaleString()}개`, "#34445e", "all");
+      for (const category of categories) {
+        const layers = semanticLayers.filter((layer) => layer.key === category.key);
+        const entities = layers.reduce((total, layer) => total + layer.count, 0);
+        const rendered = result.primitives.filter((primitive) => layers.some((layer) => layer.name === primitive.layer)).length;
+        const detail = category.key === "door"
+          ? `문 배치 ${entities.toLocaleString()}개 · 구성 도형 ${rendered.toLocaleString()}개`
+          : category.key === "opening" && entities === 0
+            ? `블록 내부 도형 ${rendered.toLocaleString()}개`
+            : `CAD 요소 ${entities.toLocaleString()}개`;
+        addFilter(category.label, detail, category.semanticColor, category.key, category.description);
+      }
+    }
+
     function renderDrawing(primitives) {
       const preview = document.getElementById("drawingPreview");
       preview.replaceChildren();
-      if (primitives.length === 0) {
+      const matchingPrimitives = activeSemanticFilter
+        ? primitives.filter((primitive) => DxfAnalyzer.classifyLayer(primitive.layer).key === activeSemanticFilter)
+        : primitives;
+      if (matchingPrimitives.length === 0) {
         const empty = document.createElement("p");
         empty.className = "drawing-empty";
-        empty.textContent = "지원하는 도형이 없어 미리보기를 표시할 수 없습니다. 객체 유형과 레이어 집계는 확인할 수 있습니다.";
+        empty.textContent = activeSemanticFilter
+          ? "선택한 의미 요소에서 미리보기 가능한 도형을 찾지 못했습니다."
+          : "지원하는 도형이 없어 미리보기를 표시할 수 없습니다. 객체 유형과 레이어 집계는 확인할 수 있습니다.";
         preview.append(empty);
         return;
       }
 
-      const visiblePrimitives = primitives.slice(0, 2500);
+      const visiblePrimitives = matchingPrimitives.slice(0, 2500);
       let minX = Infinity;
       let maxX = -Infinity;
       let minY = Infinity;
@@ -544,11 +630,10 @@
       const svg = document.createElementNS(svgNamespace, "svg");
       svg.setAttribute("viewBox", `${minX - padding} ${-maxY - padding} ${maxX - minX + padding * 2 || 1} ${maxY - minY + padding * 2 || 1}`);
       svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
-      const layerIndexes = new Map(resultLayers(visiblePrimitives).map((layer, index) => [layer, index]));
       let remainingPathPoints = 100000;
 
       for (const primitive of visiblePrimitives) {
-        const color = layerColors[(layerIndexes.get(primitive.layer) || 0) % layerColors.length];
+        const color = DxfAnalyzer.classifyLayer(primitive.layer).semanticColor;
         let shape;
         if (primitive.type === "circle") {
           shape = document.createElementNS(svgNamespace, "circle");
@@ -573,16 +658,12 @@
         svg.append(shape);
       }
       preview.append(svg);
-      if (primitives.length > visiblePrimitives.length) {
+      if (matchingPrimitives.length > visiblePrimitives.length) {
         const note = document.createElement("p");
         note.className = "drawing-empty";
         note.textContent = `미리보기는 처음 ${visiblePrimitives.length.toLocaleString()}개 객체까지 표시합니다.`;
         preview.append(note);
       }
-    }
-
-    function resultLayers(primitives) {
-      return [...new Set(primitives.map((primitive) => primitive.layer))];
     }
   </script>
 </body>

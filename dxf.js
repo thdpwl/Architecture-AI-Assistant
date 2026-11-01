@@ -7,6 +7,48 @@
 
   const MAX_ENTITIES = 100000;
   const KNOWN_SECTIONS = new Set(["HEADER", "CLASSES", "TABLES", "BLOCKS", "ENTITIES", "OBJECTS", "THUMBNAILIMAGE", "ACDSDATA"]);
+  const SEMANTIC_LAYERS = {
+    "AA-DWXM-DOOR": {
+      key: "door",
+      label: "문·문틀",
+      description: "문 블록과 문짝 선",
+      semanticColor: "#4268e8"
+    },
+    "AA-WAXM-CONC": {
+      key: "concrete-wall",
+      label: "콘크리트 벽체",
+      description: "콘크리트 벽체 선 요소",
+      semanticColor: "#d36a43"
+    },
+    "AA-WAXS-FIN1": {
+      key: "finish",
+      label: "마감재",
+      description: "바닥·벽 마감 선 요소",
+      semanticColor: "#23876b"
+    },
+    PBTEX: {
+      key: "column",
+      label: "기둥",
+      description: "기둥 외곽 선",
+      semanticColor: "#8556bc"
+    },
+    "AA-XXXX-OPEN": {
+      key: "opening",
+      label: "개구부·문 여닫이선",
+      description: "레이어명과 블록 내 선 형상으로 추정",
+      semanticColor: "#d38529"
+    }
+  };
+
+  function classifyLayer(name) {
+    const semantic = SEMANTIC_LAYERS[String(name || "").toUpperCase()];
+    return semantic || {
+      key: "other",
+      label: "미분류",
+      description: "확인된 도면 의미 없음",
+      semanticColor: "#738096"
+    };
+  }
 
   function parsePairs(text) {
     const lines = text.replace(/^\uFEFF/, "").replace(/\s+$/, "").split(/\r\n|\n|\r/);
@@ -233,11 +275,14 @@
       if (section === "TABLES" && pair.value === "LAYER") {
         const name = record.find((item) => item.code === 2)?.value;
         if (name) {
+          const semantic = classifyLayer(name);
           layers.set(name, {
             name,
             color: firstValue(record, 62),
             flags: firstValue(record, 70) || 0,
-            count: layers.get(name)?.count || 0
+            count: layers.get(name)?.count || 0,
+            entityCounts: layers.get(name)?.entityCounts || {},
+            ...semantic
           });
         }
       }
@@ -250,8 +295,16 @@
         const layer = record.find((item) => item.code === 8)?.value || "0";
         const type = pair.value.toUpperCase();
         entityCounts.set(type, (entityCounts.get(type) || 0) + 1);
-        const layerInfo = layers.get(layer) || { name: layer, color: null, flags: 0, count: 0 };
+        const layerInfo = layers.get(layer) || {
+          name: layer,
+          color: null,
+          flags: 0,
+          count: 0,
+          entityCounts: {},
+          ...classifyLayer(layer)
+        };
         layerInfo.count += 1;
+        layerInfo.entityCounts[type] = (layerInfo.entityCounts[type] || 0) + 1;
         layers.set(layer, layerInfo);
 
         const geometry = entityGeometry(type, record);
@@ -282,5 +335,5 @@
     };
   }
 
-  return { parseDxf };
+  return { parseDxf, classifyLayer };
 });
