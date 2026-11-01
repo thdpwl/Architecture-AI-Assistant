@@ -1,7 +1,7 @@
 const test = require("node:test");
 const assert = require("node:assert/strict");
 const fs = require("node:fs");
-const { parseDxf } = require("../dxf.js");
+const { parseDxf, classifyLayer } = require("../dxf.js");
 
 function dxf(pairs) {
   return pairs.map(([code, value]) => `${code}\n${value}\n`).join("");
@@ -72,7 +72,30 @@ test("reads the issue #3 commercial floorplan example without personal drawing m
   assert.equal(result.primitives.length, 49);
   assert.ok(result.bounds.width > 25000);
   assert.ok(result.bounds.height > 5000);
+  assert.deepEqual(
+    result.layers
+      .filter((layer) => layer.key !== "other")
+      .map(({ name, key, label }) => [name, key, label]),
+    [
+      ["AA-DWXM-DOOR", "door", "문·문틀"],
+      ["AA-WAXM-CONC", "concrete-wall", "콘크리트 벽체"],
+      ["AA-WAXS-FIN1", "finish", "마감재"],
+      ["AA-XXXX-OPEN", "opening", "개구부·문 여닫이선"],
+      ["PBTEX", "column", "기둥"]
+    ]
+  );
+  assert.equal(result.layers.find((layer) => layer.key === "door").count, 2);
+  assert.equal(result.layers.find((layer) => layer.key === "concrete-wall").count, 25);
+  assert.equal(result.layers.find((layer) => layer.key === "finish").count, 8);
+  assert.equal(result.layers.find((layer) => layer.key === "column").count, 8);
+  assert.equal(result.layers.find((layer) => layer.name === "PBTEX").entityCounts.LWPOLYLINE, 8);
   assert.doesNotMatch(drawing, /LASTSAVEDBY|LATITUDE|LONGITUDE|dpwl2/i);
+});
+
+test("classifies the issue-defined layer names case-insensitively and leaves other layers unknown", () => {
+  assert.equal(classifyLayer("aa-waxm-conc").key, "concrete-wall");
+  assert.equal(classifyLayer("custom-wall").key, "other");
+  assert.equal(classifyLayer(null).label, "미분류");
 });
 
 test("rejects malformed, empty, binary, and sectionless DXF input", () => {
