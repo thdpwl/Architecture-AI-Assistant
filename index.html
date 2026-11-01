@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7fb">
+  <meta name="description" content="건축 실무를 위한 AI 어시스턴트 프로토타입과 DXF 도면 브라우저 분석">
+  <title>건축 AI 어시스턴트 | DXF 분석</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #17243a;
+      --muted: #78859a;
+      --line: #e7ebf2;
+      --surface: #fff;
+      --canvas: #f5f7fb;
+      --blue: #4268e8;
+      --blue-soft: #eef2ff;
+      --green: #23876b;
+      --shadow: 0 12px 36px rgba(27, 45, 80, .07);
+      font-family: Inter, Pretendard, "Noto Sans KR", "Malgun Gothic", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--canvas); color: var(--ink); }
+    button, textarea { font: inherit; }
+    button { cursor: pointer; }
+    .app { display: grid; grid-template-columns: 248px minmax(0, 1fr); min-height: 100vh; }
+    .sidebar { position: sticky; top: 0; display: flex; flex-direction: column; height: 100vh; padding: 27px 17px 18px; background: #fff; border-right: 1px solid var(--line); }
+    .brand { display: flex; align-items: center; gap: 11px; padding: 0 10px 29px; }
+    .brand-mark { display: grid; place-items: center; width: 39px; height: 39px; color: white; background: linear-gradient(145deg, #6182f8, #3557d3); border-radius: 12px; box-shadow: 0 7px 16px #4268e83b; }
+    .brand-mark svg { width: 22px; height: 22px; }
+    .brand strong { display: block; font-size: 14px; letter-spacing: -.4px; }
+    .brand span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .nav-label { padding: 0 11px; margin: 8px 0 9px; color: #a0a9b8; font-size: 10px; font-weight: 700; letter-spacing: 1.2px; }
+    .nav { display: grid; gap: 5px; }
+    .nav button { display: flex; align-items: center; gap: 12px; width: 100%; padding: 11px 12px; color: #69768b; background: transparent; border: 0; border-radius: 9px; text-align: left; font-size: 13px; transition: .18s ease; }
+    .nav button:hover { color: var(--ink); background: #f7f8fb; }
+    .nav button.active { color: var(--blue); background: var(--blue-soft); font-weight: 700; }
+    .nav svg { width: 17px; height: 17px; flex: none; }
+    .side-bottom { margin-top: auto; }
+    .meeting-card { margin: 12px 5px 16px; padding: 14px; background: #f8f9fc; border: 1px solid var(--line); border-radius: 12px; }
+    .meeting-card .tiny { color: var(--muted); font-size: 10px; }
+    .meeting-card strong { display: block; margin: 7px 0 6px; font-size: 12px; }
+    .meeting-card p { margin: 0; color: #8490a2; font-size: 10px; line-height: 1.6; }
+    .profile { display: flex; align-items: center; gap: 10px; padding: 13px 10px 0; border-top: 1px solid var(--line); }
+    .avatar { display: grid; place-items: center; width: 31px; height: 31px; border-radius: 50%; color: #526bc6; background: #e9edff; font-size: 12px; font-weight: 700; }
+    .profile strong { display: block; font-size: 11px; }
+    .profile span { color: var(--muted); font-size: 10px; }
+    main { min-width: 0; padding: 25px clamp(20px, 4vw, 58px) 48px; }
+    .topbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; max-width: 1250px; margin: 0 auto 31px; }
+    .crumb { color: var(--muted); font-size: 12px; }
+    .crumb b { color: var(--ink); font-weight: 600; }
+    .top-actions { display: flex; align-items: center; gap: 10px; }
+    .prototype-tag { display: flex; align-items: center; gap: 7px; padding: 7px 10px; border: 1px solid #dce5ff; border-radius: 99px; color: #536cb8; background: #f5f7ff; font-size: 10px; font-weight: 700; }
+    .prototype-tag i { width: 6px; height: 6px; background: #6885ec; border-radius: 50%; }
+    .icon-button { display: grid; place-items: center; width: 34px; height: 34px; color: #68758a; background: white; border: 1px solid var(--line); border-radius: 9px; }
+    .icon-button svg { width: 16px; height: 16px; }
+    .content { max-width: 1250px; margin: auto; }
+    .eyebrow { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; color: var(--blue); font-size: 11px; font-weight: 700; letter-spacing: .3px; }
+    .eyebrow span { width: 20px; height: 1px; background: var(--blue); }
+    h1 { margin: 0; font-size: clamp(26px, 3vw, 36px); letter-spacing: -1.6px; line-height: 1.3; }
+    .intro { margin: 11px 0 25px; color: var(--muted); font-size: 13px; line-height: 1.7; }
+    .hero { display: grid; grid-template-columns: minmax(0, 1.45fr) minmax(230px, .75fr); min-height: 216px; overflow: hidden; color: white; background: #172c4a; border-radius: 17px; box-shadow: var(--shadow); }
+    .hero-copy { position: relative; z-index: 1; padding: 26px 30px; }
+    .hero-kicker { color: #a8c0ff; font-size: 10px; font-weight: 700; letter-spacing: 1.1px; }
+    .hero h2 { margin: 12px 0 8px; font-size: 22px; letter-spacing: -.7px; }
+    .hero p { margin: 0; color: #c1ccdc; font-size: 11px; line-height: 1.7; }
+    .prompt-box { display: flex; gap: 9px; max-width: 540px; margin-top: 21px; padding: 6px; background: white; border: 1px solid #ffffff3b; border-radius: 10px; }
+    .prompt-box input { flex: 1; min-width: 0; padding: 8px 9px; color: var(--ink); background: transparent; border: 0; outline: 0; font-size: 11px; }
+    .prompt-box input::placeholder { color: #9aa5b7; }
+    .send-button { display: flex; align-items: center; gap: 7px; padding: 9px 13px; color: white; background: var(--blue); border: 0; border-radius: 7px; font-size: 10px; font-weight: 700; }
+    .send-button:hover { background: #3457d1; }
+    .send-button svg { width: 13px; height: 13px; }
+    .hero-art { position: relative; overflow: hidden; min-height: 216px; background: radial-gradient(ellipse at 60% 48%, #4168ae 0, #263f66 37%, #172c4a 71%); }
+    .blueprint { position: absolute; inset: 20px 16px; opacity: .8; }
+    .blueprint svg { width: 100%; height: 100%; }
+    .hero-orb { position: absolute; width: 155px; height: 155px; top: 37px; left: 37%; border: 1px solid #a7c7ff40; border-radius: 50%; box-shadow: 0 0 60px #7facff21, inset 0 0 50px #7facff12; }
+    .hero-orb:after { content: ""; position: absolute; inset: 19px; border: 1px dashed #b3ceff65; border-radius: 50%; }
+    .dxf-panel { margin-top: 18px; padding: 18px; background: white; border: 1px solid var(--line); border-radius: 12px; }
+    .dxf-panel .section-heading { margin: 0 0 13px; }
+    .drop-zone { display: grid; justify-items: center; gap: 7px; padding: 19px 16px; color: #64728a; background: #fafbff; border: 1px dashed #cbd4e4; border-radius: 10px; text-align: center; transition: .18s ease; }
+    .drop-zone.dragging { background: #f0f3ff; border-color: #7088eb; }
+    .drop-icon { display: grid; place-items: center; width: 34px; height: 34px; color: var(--blue); background: var(--blue-soft); border-radius: 10px; }
+    .drop-icon svg { width: 18px; height: 18px; }
+    .drop-zone strong { color: var(--ink); font-size: 11px; }
+    .drop-zone p { margin: 0; font-size: 9px; }
+    .upload-button { margin-top: 3px; padding: 8px 12px; color: white; background: var(--blue); border: 0; border-radius: 7px; font-size: 10px; font-weight: 700; }
+    .upload-button:hover { background: #3457d1; }
+    .file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; clip-path: inset(50%); }
+    .file-input:focus-visible + .drop-zone .upload-button { outline: 3px solid #9aacef; outline-offset: 3px; }
+    .dxf-status { min-height: 16px; margin: 9px 0 0; color: var(--muted); font-size: 10px; }
+    .dxf-status.error { color: #b54444; }
+    .dxf-results { display: none; margin-top: 14px; padding-top: 14px; border-top: 1px solid var(--line); }
+    .dxf-results.visible { display: block; }
+    .result-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 11px; }
+    .result-head strong { overflow-wrap: anywhere; font-size: 11px; }
+    .result-head span { color: var(--muted); font-size: 9px; }
+    .dxf-result-grid { display: grid; grid-template-columns: minmax(0, 1.5fr) minmax(220px, .8fr); gap: 12px; }
+    .drawing-preview { display: grid; place-items: center; min-height: 210px; overflow: hidden; background: #f8faff; border: 1px solid #edf0f6; border-radius: 9px; }
+    .drawing-preview svg { display: block; width: 100%; height: 100%; min-height: 210px; max-height: 400px; }
+    .drawing-empty { padding: 20px; color: var(--muted); text-align: center; font-size: 10px; line-height: 1.6; }
+    .layer-table-wrap { max-height: 310px; overflow: auto; border: 1px solid #edf0f6; border-radius: 9px; }
+    .layer-table { width: 100%; border-collapse: collapse; text-align: left; }
+    .layer-table th, .layer-table td { padding: 8px 9px; border-bottom: 1px solid #eff1f5; font-size: 9px; }
+    .layer-table th { position: sticky; top: 0; color: #758198; background: #f8f9fc; font-weight: 600; }
+    .layer-table td:first-child { max-width: 180px; overflow-wrap: anywhere; color: #46546b; }
+    .layer-table td:last-child, .layer-table th:last-child { text-align: right; }
+    .entity-summary { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 9px; }
+    .entity-chip { padding: 5px 7px; color: #526bc6; background: #f0f3ff; border-radius: 20px; font-size: 9px; }
+    .dxf-limit { margin: 10px 0 0; color: #7e899b; font-size: 9px; line-height: 1.6; }
+    .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 13px; margin-top: 17px; }
+    .stat { display: flex; align-items: center; gap: 12px; padding: 15px; background: white; border: 1px solid var(--line); border-radius: 12px; }
+    .stat-icon { display: grid; place-items: center; width: 35px; height: 35px; color: var(--blue); background: var(--blue-soft); border-radius: 10px; }
+    .stat-icon svg { width: 17px; height: 17px; }
+    .stat strong { display: block; font-size: 15px; letter-spacing: -.3px; }
+    .stat span { display: block; margin-top: 3px; color: var(--muted); font-size: 10px; }
+    .section-heading { display: flex; align-items: end; justify-content: space-between; gap: 14px; margin: 29px 0 13px; }
+    .section-heading h2 { margin: 0; font-size: 16px; letter-spacing: -.5px; }
+    .section-heading p { margin: 5px 0 0; color: var(--muted); font-size: 10px; }
+    .text-link { padding: 6px 0; color: var(--blue); background: none; border: 0; font-size: 10px; font-weight: 700; }
+    .roadmap { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .phase { position: relative; min-height: 193px; padding: 16px; background: white; border: 1px solid var(--line); border-radius: 12px; transition: transform .18s, box-shadow .18s; }
+    .phase:hover { transform: translateY(-2px); box-shadow: var(--shadow); }
+    .phase.current { border-color: #bac8ff; box-shadow: 0 0 0 2px #edf0ff; }
+    .phase-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 15px; }
+    .phase-num { color: #9ba6b7; font-size: 10px; font-weight: 700; letter-spacing: .7px; }
+    .phase-state { padding: 5px 7px; color: #78859a; background: #f2f4f7; border-radius: 20px; font-size: 9px; }
+    .phase.current .phase-state { color: #4562cc; background: #edf1ff; }
+    .phase h3 { margin: 0 0 6px; font-size: 13px; letter-spacing: -.3px; }
+    .phase p { min-height: 33px; margin: 0; color: var(--muted); font-size: 10px; line-height: 1.6; }
+    .phase ul { display: grid; gap: 7px; margin: 14px 0 0; padding: 12px 0 0; border-top: 1px solid #eff1f5; list-style: none; }
+    .phase li { display: flex; align-items: center; gap: 7px; color: #58667c; font-size: 10px; }
+    .phase li:before { content: ""; width: 5px; height: 5px; flex: none; background: #9eacc2; border-radius: 50%; }
+    .phase.current li:before { background: #6580eb; }
+    .bottom-grid { display: grid; grid-template-columns: 1.15fr .85fr; gap: 14px; margin-top: 18px; }
+    .panel { padding: 18px; background: white; border: 1px solid var(--line); border-radius: 12px; }
+    .panel-title { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
+    .panel-title h3 { margin: 0; font-size: 13px; }
+    .panel-title span { color: var(--muted); font-size: 9px; }
+    .capabilities { display: grid; grid-template-columns: repeat(2, 1fr); gap: 9px; }
+    .capability { display: flex; align-items: center; gap: 9px; min-height: 40px; padding: 8px; background: #fafbfc; border: 1px solid #f0f2f6; border-radius: 8px; color: #59667b; font-size: 10px; }
+    .capability b { display: grid; place-items: center; width: 22px; height: 22px; color: #5670dc; background: #edf1ff; border-radius: 6px; font-size: 9px; }
+    .capability.future b { color: #8995a8; background: #f0f2f5; }
+    .progress-row { display: flex; align-items: center; justify-content: space-between; margin: 15px 0 7px; color: #6b7890; font-size: 9px; }
+    .progress { height: 5px; overflow: hidden; background: #eef0f4; border-radius: 99px; }
+    .progress span { display: block; width: 12%; height: 100%; background: linear-gradient(90deg, #6181f1, #8099f7); border-radius: inherit; }
+    .data-note { display: flex; gap: 10px; margin-top: 13px; padding: 11px; color: #657187; background: #f8f9fc; border-radius: 8px; font-size: 9px; line-height: 1.6; }
+    .data-note b { color: #526bc6; }
+    .data-note .note-icon { color: #6580eb; font-size: 14px; }
+    .deliverable-list { display: grid; gap: 8px; }
+    .deliverable { display: flex; align-items: center; gap: 10px; padding: 9px; border: 1px solid #eff1f5; border-radius: 8px; }
+    .file-icon { display: grid; place-items: center; width: 29px; height: 29px; color: #7385d4; background: #f0f3ff; border-radius: 8px; font-size: 9px; font-weight: 700; }
+    .deliverable strong { display: block; font-size: 10px; }
+    .deliverable span { display: block; margin-top: 3px; color: var(--muted); font-size: 9px; }
+    .file-status { margin-left: auto; padding: 4px 6px; color: #8b95a5; background: #f1f3f6; border-radius: 20px; font-size: 8px; }
+    .notice { margin-top: 18px; padding: 11px 13px; color: #768297; border-left: 2px solid #9aacef; background: #f9faff; font-size: 9px; line-height: 1.7; }
+    .toast { position: fixed; right: 24px; bottom: 24px; z-index: 5; max-width: min(390px, calc(100vw - 32px)); padding: 14px 17px; color: white; background: #20304c; border-radius: 10px; box-shadow: 0 10px 28px #14233a40; font-size: 12px; line-height: 1.6; opacity: 0; pointer-events: none; transform: translateY(10px); transition: .22s ease; }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    @media (max-width: 1050px) {
+      .app { grid-template-columns: 205px minmax(0, 1fr); }
+      .roadmap { grid-template-columns: repeat(2, 1fr); }
+      .stat-grid { grid-template-columns: repeat(2, 1fr); }
+      .hero { grid-template-columns: minmax(0, 1.4fr) minmax(180px, .7fr); }
+    }
+    @media (max-width: 720px) {
+      .app { display: block; }
+      .sidebar { position: fixed; z-index: 4; inset: auto 0 0; display: block; width: 100%; height: auto; padding: 7px 9px calc(7px + env(safe-area-inset-bottom)); border-top: 1px solid var(--line); border-right: 0; }
+      .brand, .nav-label, .side-bottom { display: none; }
+      .nav { display: flex; justify-content: space-around; gap: 2px; }
+      .nav button { display: grid; justify-items: center; gap: 4px; width: 25%; padding: 7px 3px; font-size: 9px; }
+      .nav svg { width: 17px; height: 17px; }
+      main { padding: 19px 16px 98px; }
+      .topbar { margin-bottom: 25px; }
+      .hero { grid-template-columns: 1fr; }
+      .hero-copy { padding: 23px 20px; }
+      .hero-art { display: none; }
+      .bottom-grid { grid-template-columns: 1fr; }
+      .dxf-result-grid { grid-template-columns: 1fr; }
+      .drawing-preview { min-height: 180px; }
+      .drawing-preview svg { min-height: 180px; }
+    }
+    @media (max-width: 480px) {
+      .prototype-tag { font-size: 9px; }
+      .roadmap { grid-template-columns: 1fr; }
+      .phase { min-height: 0; }
+      .phase p { min-height: 0; }
+      .stat { gap: 9px; padding: 11px; }
+      .stat-icon { width: 31px; height: 31px; }
+      .capabilities { grid-template-columns: 1fr; }
+      .intro { font-size: 12px; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      *, *:before, *:after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar" aria-label="주 메뉴">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none"><path d="M4 19.5V9l8-4.5 8 4.5v10.5H4Z" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M8 19.5v-6h8v6M8 9.5h.01M12 9.5h.01M16 9.5h.01" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></svg>
+        </div>
+        <div><strong>ARCHI AI</strong><span>건축 AI 어시스턴트</span></div>
+      </div>
+      <div class="nav-label">WORKSPACE</div>
+      <nav class="nav">
+        <button class="active" data-section="overview"><svg viewBox="0 0 24 24" fill="none"><rect x="3.5" y="3.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="3.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="3.5" y="13.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/><rect x="13.5" y="13.5" width="7" height="7" rx="1.5" stroke="currentColor" stroke-width="1.6"/></svg>대시보드</button>
+        <button data-section="assistant"><svg viewBox="0 0 24 24" fill="none"><path d="M12 3.5 14.2 9.8 20.5 12l-6.3 2.2L12 20.5l-2.2-6.3L3.5 12l6.3-2.2L12 3.5Z" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg>AI 상담</button>
+        <button data-section="dxf"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4zM8 9h8M8 12h5M8 15h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>DXF 분석</button>
+        <button data-section="capabilities"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5.5h16v13H4zM8 9h8M8 12h5M8 15h7" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>기능 미리보기</button>
+        <button data-section="roadmap"><svg viewBox="0 0 24 24" fill="none"><path d="M5 19V5m0 0 4 3-4 3m0-6h13v6H5m0 2h13v6H5" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg>개발 로드맵</button>
+      </nav>
+      <div class="side-bottom">
+        <div class="meeting-card"><span class="tiny">NEXT MILESTONE</span><strong>교수님 미팅 후 기획 확정</strong><p>피드백을 반영해 우선순위와 구현 범위를 업데이트합니다.</p></div>
+        <div class="profile"><div class="avatar">A</div><div><strong>프로젝트 팀</strong><span>DXF 분석 MVP</span></div></div>
+      </div>
+    </aside>
+
+    <main>
+      <header class="topbar">
+        <div class="crumb">프로젝트 <span aria-hidden="true">/</span> <b>개발 로드맵</b></div>
+        <div class="top-actions"><div class="prototype-tag"><i></i>DXF 브라우저 분석</div><button class="icon-button" id="noticeButton" aria-label="안내 보기"><svg viewBox="0 0 24 24" fill="none"><path d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9ZM10 21h4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></button></div>
+      </header>
+
+      <div class="content" id="overview">
+        <div class="eyebrow"><span></span>PROJECT OVERVIEW</div>
+        <h1>건축의 다음 단계를,<br>대화에서 시작합니다.</h1>
+        <p class="intro">건축 실무자의 지식과 도면 데이터를 이해하는 AI 어시스턴트.<br>첫 실제 기능으로 DXF 도면의 레이어와 주요 객체를 브라우저에서 분석합니다.</p>
+
+        <section class="hero" id="assistant" aria-label="AI 상담 시뮬레이션">
+          <div class="hero-copy">
+            <div class="hero-kicker">ARCHITECTURE, REIMAGINED</div>
+            <h2>어떤 건축 작업을 도와드릴까요?</h2>
+            <p>기획부터 도면 검토까지, 자연어로 요청해 보세요.<br>AI 상담은 데모이며, DXF 분석은 아래에서 실제 파일로 확인할 수 있습니다.</p>
+            <form class="prompt-box" id="promptForm">
+              <input id="promptInput" type="text" aria-label="AI 요청 입력" placeholder="예: 이 평면도의 주요 공간을 정리해줘">
+              <button class="send-button" type="submit">요청하기<svg viewBox="0 0 24 24" fill="none"><path d="m5 12 14-7-5 14-2.5-5.5L5 12Z" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"/></svg></button>
+            </form>
+          </div>
+          <div class="hero-art" aria-hidden="true">
+            <div class="hero-orb"></div>
+            <div class="blueprint"><svg viewBox="0 0 260 190" fill="none">
+              <g stroke="#c7dcff" stroke-width="1" opacity=".8">
+                <path d="M38 40h76v48H38zM114 40h62v32h-62zM114 72h62v57h-62zM38 88h38v41H38zM76 88h38v41H76zM176 40h48v89h-48zM38 129h186v25H38z"/>
+                <path d="M52 53h44v22H52zM125 51h39M125 61h26M125 85h38M125 95h26M125 108h38M49 101h15M87 102h16M188 55h24v22h-24zM188 90h24v26h-24z"/>
+                <path d="M31 34v126M31 34h-6m6 126h-6m10 7h187m-187 5v-6m187 6v-6" stroke-dasharray="3 3" opacity=".65"/>
+                <circle cx="114" cy="72" r="2" fill="#c7dcff"/><circle cx="76" cy="88" r="2" fill="#c7dcff"/>
+              </g>
+            </svg></div>
+          </div>
+        </section>
+
+        <section class="dxf-panel" id="dxf" aria-labelledby="dxfTitle">
+          <div class="section-heading">
+            <div><h2 id="dxfTitle">DXF 도면 빠른 분석</h2><p>파일은 이 브라우저에서만 처리되며 서버로 전송되지 않습니다.</p></div>
+          </div>
+          <input class="file-input" id="dxfFile" type="file" accept=".dxf,application/dxf" aria-label="분석할 DXF 파일 선택">
+          <div class="drop-zone" id="dropZone" tabindex="0" role="button" aria-label="DXF 파일을 선택하거나 이 영역에 끌어다 놓으세요">
+            <div class="drop-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none"><path d="M12 16V4m0 0L7 9m5-5 5 5M5 14v5h14v-5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"/></svg></div>
+            <strong>DXF 파일을 끌어 놓거나 선택하세요</strong>
+            <p>텍스트 DXF · 최대 20MB · 파일 내용은 업로드되지 않습니다</p>
+            <button class="upload-button" id="chooseDxf" type="button">파일 선택</button>
+          </div>
+          <p class="dxf-status" id="dxfStatus" role="status" aria-live="polite">레이어 이름과 객체 수를 확인하고 주요 도형을 미리 볼 수 있습니다.</p>
+          <div class="dxf-results" id="dxfResults">
+            <div class="result-head"><strong id="dxfFileName"></strong><span id="dxfSummary"></span></div>
+            <div class="dxf-result-grid">
+              <div class="drawing-preview" id="drawingPreview" role="img" aria-label="DXF 도면 미리보기"></div>
+              <div class="layer-table-wrap">
+                <table class="layer-table"><thead><tr><th scope="col">레이어</th><th scope="col">색상</th><th scope="col">객체</th></tr></thead><tbody id="layerRows"></tbody></table>
+              </div>
+            </div>
+            <div class="entity-summary" id="entitySummary"></div>
+          </div>
+          <p class="dxf-limit">미리보기 지원: LINE, LWPOLYLINE, CIRCLE, ARC. 이 결과는 기본 도면 정보이며 건설CALS/EC 표준 적합성이나 건축 설계·법규 검토 판정이 아닙니다.</p>
+        </section>
+
+        <section class="stat-grid" aria-label="프로젝트 현황">
+          <div class="stat"><div class="stat-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 19V5m0 0 4 3-4 3m0-6h15v6H4m0 2h15v6H4" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><strong>4단계</strong><span>개발 로드맵</span></div></div>
+          <div class="stat"><div class="stat-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 5h16v14H4zM8 9h8M8 12h5M8 15h8" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div><strong>10개</strong><span>예상 핵심 기능</span></div></div>
+          <div class="stat"><div class="stat-icon"><svg viewBox="0 0 24 24" fill="none"><path d="M4 18.5V5.5L12 3l8 2.5v13L12 21l-8-2.5Z M12 3v18m-8-15.5 8 2.5 8-2.5" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/></svg></div><div><strong>DXF</strong><span>우선 검토 데이터</span></div></div>
+          <div class="stat"><div class="stat-icon"><svg viewBox="0 0 24 24" fill="none"><circle cx="12" cy="12" r="8.5" stroke="currentColor" stroke-width="1.6"/><path d="M12 7v5l3 2" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></div><div><strong>1차 MVP</strong><span>현재 진행 상태</span></div></div>
+        </section>
+
+        <section id="roadmap">
+          <div class="section-heading"><div><h2>개발 로드맵</h2><p>교수님 미팅 이후 우선순위와 범위를 함께 조정할 예정입니다.</p></div><button class="text-link" id="roadmapInfo">로드맵 안내 ↗</button></div>
+          <div class="roadmap">
+            <article class="phase current"><div class="phase-top"><span class="phase-num">PHASE 01</span><span class="phase-state">진행 중 · 1차 MVP</span></div><h3>DXF 도면 브라우저 분석</h3><p>텍스트 DXF에서 레이어·객체를 추출해 기초 미리보기를 제공합니다.</p><ul><li>DXF 파일 로컬 업로드</li><li>레이어 및 객체 유형 집계</li><li>주요 도형 미리보기</li></ul></article>
+            <article class="phase"><div class="phase-top"><span class="phase-num">PHASE 02</span><span class="phase-state">다음 단계</span></div><h3>도면 이해와 설계 보조</h3><p>건축 도면을 읽고 실무에 필요한 초안을 제안합니다.</p><ul><li>DXF 업로드·레이어 분석</li><li>평면도 공간·기호 인식</li><li>기획안·도면 초안 생성</li></ul></article>
+            <article class="phase"><div class="phase-top"><span class="phase-num">PHASE 03</span><span class="phase-state">중장기</span></div><h3>BIM·법규·검토 자동화</h3><p>모델 기반 작업과 국내 건축 기준 검토로 확장합니다.</p><ul><li>렌더링 이미지·BIM 모델</li><li>도면/BIM 편집 및 점검</li><li>법규·인허가 체크 지원</li></ul></article>
+            <article class="phase"><div class="phase-top"><span class="phase-num">PHASE 04</span><span class="phase-state">확장</span></div><h3>현상설계와 사업성 지원</h3><p>설계 제안부터 공사비 검토까지 업무 흐름을 연결합니다.</p><ul><li>보고서·심사 패널 제작</li><li>공사비 예측·견적 지원</li><li>현장 피드백 기반 기능 확장</li></ul></article>
+          </div>
+        </section>
+
+        <div class="bottom-grid">
+          <section class="panel" id="capabilities">
+            <div class="panel-title"><h3>예상 기능 범위</h3><span>이슈 #1 기반 · 우선순위 협의 예정</span></div>
+            <div class="capabilities">
+              <div class="capability"><b>01</b>건축 질의응답</div><div class="capability"><b>02</b>렌더링 이미지 생성</div>
+              <div class="capability"><b>03</b>BIM 모델 생성</div><div class="capability"><b>04</b>도면 생성·편집</div>
+              <div class="capability"><b>05</b>BIM 파일 점검</div><div class="capability"><b>06</b>건축 법규 체크</div>
+              <div class="capability"><b>07</b>인허가 점검·검수</div><div class="capability"><b>08</b>현상설계 보고서·패널</div>
+              <div class="capability"><b>09</b>현상설계 심사 보조</div><div class="capability"><b>10</b>공사비 예측·견적서</div>
+            </div>
+            <div class="progress-row"><span>기획 및 프로토타입 준비</span><strong>초기</strong></div><div class="progress"><span></span></div>
+            <div class="data-note"><span class="note-icon">◇</span><span><b>데이터 방향</b> · DXF 파일과 건설CALS/EC 전자도면 작성표준의 레이어 규칙을 우선 검토합니다.</span></div>
+          </section>
+          <section class="panel">
+            <div class="panel-title"><h3>예상 산출물</h3><span>개발 단계에 따라 순차 제공</span></div>
+            <div class="deliverable-list">
+              <div class="deliverable"><div class="file-icon">TXT</div><div><strong>건축 기획안 초안</strong><span>요구사항 요약 및 공간 프로그램</span></div><span class="file-status">예정</span></div>
+              <div class="deliverable"><div class="file-icon">DXF</div><div><strong>도면 데이터 분석 결과</strong><span>레이어 및 평면 구성 정보</span></div><span class="file-status">예정</span></div>
+              <div class="deliverable"><div class="file-icon">BIM</div><div><strong>설계 시안·모델</strong><span>이미지 및 BIM 기반 결과물</span></div><span class="file-status">추후</span></div>
+            </div>
+            <div class="notice">※ 표시된 기능과 산출물은 이슈 #1의 초기 구상을 바탕으로 한 제안입니다. 실제 구현 범위·일정·기술 방식은 미확정이며, 미팅 피드백 이후 조정됩니다.</div>
+          </section>
+        </div>
+      </div>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  <script src="dxf.js"></script>
+  <script>
+    const toast = document.getElementById("toast");
+    let toastTimer;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add("show");
+      window.clearTimeout(toastTimer);
+      toastTimer = window.setTimeout(() => toast.classList.remove("show"), 4200);
+    }
+
+    document.querySelectorAll(".nav button").forEach((button) => {
+      button.addEventListener("click", () => {
+        document.querySelector(".nav button.active")?.classList.remove("active");
+        button.classList.add("active");
+        document.getElementById(button.dataset.section).scrollIntoView({ behavior: "smooth", block: "start" });
+      });
+    });
+
+    document.getElementById("promptForm").addEventListener("submit", (event) => {
+      event.preventDefault();
+      const input = document.getElementById("promptInput");
+      const request = input.value.trim();
+      if (!request) {
+        showToast("요청 내용을 입력해 주세요. 현재 응답은 프로토타입 시뮬레이션입니다.");
+        input.focus();
+        return;
+      }
+      input.value = "";
+      showToast(`요청을 접수했어요: “${request}” · 데모 화면으로, 실제 AI 분석이나 파일 생성은 수행하지 않습니다.`);
+    });
+
+    document.getElementById("noticeButton").addEventListener("click", () => {
+      showToast("텍스트 DXF 레이어·객체 분석은 브라우저에서 실제 처리합니다. AI 상담, BIM 생성, 법규 검토는 아직 시뮬레이션입니다.");
+    });
+    document.getElementById("roadmapInfo").addEventListener("click", () => {
+      showToast("로드맵은 초기 가안입니다. 교수님 미팅에서 받은 피드백을 반영해 단계와 우선순위를 수정할 예정입니다.");
+    });
+
+    const dxfFile = document.getElementById("dxfFile");
+    const dropZone = document.getElementById("dropZone");
+    const dxfStatus = document.getElementById("dxfStatus");
+    const dxfResults = document.getElementById("dxfResults");
+    const svgNamespace = "http://www.w3.org/2000/svg";
+    const maxFileSize = 20 * 1024 * 1024;
+    const layerColors = ["#4268e8", "#23876b", "#d38529", "#8556bc", "#d04f63", "#287e9d", "#738096"];
+
+    document.getElementById("chooseDxf").addEventListener("click", (event) => {
+      event.stopPropagation();
+      dxfFile.click();
+    });
+    dropZone.addEventListener("click", () => dxfFile.click());
+    dropZone.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        dxfFile.click();
+      }
+    });
+    dxfFile.addEventListener("change", () => {
+      if (dxfFile.files.length) analyzeDxfFile(dxfFile.files[0]);
+      dxfFile.value = "";
+    });
+    ["dragenter", "dragover"].forEach((eventName) => {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.add("dragging");
+      });
+    });
+    ["dragleave", "drop"].forEach((eventName) => {
+      dropZone.addEventListener(eventName, (event) => {
+        event.preventDefault();
+        dropZone.classList.remove("dragging");
+      });
+    });
+    dropZone.addEventListener("drop", (event) => {
+      const file = event.dataTransfer.files[0];
+      if (file) analyzeDxfFile(file);
+    });
+
+    async function readDxfFile(file) {
+      const bytes = await file.arrayBuffer();
+      try {
+        return new TextDecoder("utf-8", { fatal: true }).decode(bytes);
+      } catch {
+        try {
+          return new TextDecoder("euc-kr", { fatal: true }).decode(bytes);
+        } catch {
+          throw new Error("문자 인코딩을 확인할 수 없습니다. UTF-8 또는 CP949 텍스트 DXF로 저장해 주세요.");
+        }
+      }
+    }
+
+    async function analyzeDxfFile(file) {
+      dxfResults.classList.remove("visible");
+      dxfStatus.classList.remove("error");
+      if (!file.name.toLowerCase().endsWith(".dxf")) {
+        dxfStatus.textContent = "DXF 파일(.dxf)만 선택할 수 있습니다.";
+        dxfStatus.classList.add("error");
+        return;
+      }
+      if (file.size > maxFileSize) {
+        dxfStatus.textContent = "20MB 이하의 DXF 파일을 선택해 주세요.";
+        dxfStatus.classList.add("error");
+        return;
+      }
+
+      dxfStatus.textContent = "브라우저에서 DXF를 분석하고 있습니다...";
+      try {
+        const content = await readDxfFile(file);
+        const result = DxfAnalyzer.parseDxf(content);
+        renderDxfResult(file.name, result);
+        dxfStatus.textContent = "분석 완료 · 파일은 브라우저에서 처리했으며 서버로 전송하지 않았습니다.";
+      } catch (error) {
+        dxfStatus.textContent = `분석할 수 없습니다: ${error.message}`;
+        dxfStatus.classList.add("error");
+      }
+    }
+
+    function renderDxfResult(fileName, result) {
+      document.getElementById("dxfFileName").textContent = fileName;
+      document.getElementById("dxfSummary").textContent =
+        `레이어 ${result.layers.length}개 · 전체 객체 ${result.entityCount.toLocaleString()}개`;
+
+      const layerRows = document.getElementById("layerRows");
+      layerRows.replaceChildren();
+      for (const layer of result.layers) {
+        const row = document.createElement("tr");
+        const name = document.createElement("td");
+        const color = document.createElement("td");
+        const count = document.createElement("td");
+        name.textContent = layer.name;
+        color.textContent = layer.color === null ? "기본" : String(layer.color);
+        count.textContent = layer.count.toLocaleString();
+        row.append(name, color, count);
+        layerRows.append(row);
+      }
+      if (result.layers.length === 0) {
+        const row = document.createElement("tr");
+        const cell = document.createElement("td");
+        cell.colSpan = 3;
+        cell.textContent = "레이어 정보가 없습니다.";
+        row.append(cell);
+        layerRows.append(row);
+      }
+
+      const summary = document.getElementById("entitySummary");
+      summary.replaceChildren();
+      for (const [type, count] of result.entityCounts) {
+        const chip = document.createElement("span");
+        chip.className = "entity-chip";
+        chip.textContent = `${type} ${count.toLocaleString()}`;
+        summary.append(chip);
+      }
+      renderDrawing(result.primitives);
+      dxfResults.classList.add("visible");
+    }
+
+    function renderDrawing(primitives) {
+      const preview = document.getElementById("drawingPreview");
+      preview.replaceChildren();
+      if (primitives.length === 0) {
+        const empty = document.createElement("p");
+        empty.className = "drawing-empty";
+        empty.textContent = "지원하는 도형이 없어 미리보기를 표시할 수 없습니다. 객체 유형과 레이어 집계는 확인할 수 있습니다.";
+        preview.append(empty);
+        return;
+      }
+
+      const visiblePrimitives = primitives.slice(0, 2500);
+      let minX = Infinity;
+      let maxX = -Infinity;
+      let minY = Infinity;
+      let maxY = -Infinity;
+      function includePoint(x, y) {
+        minX = Math.min(minX, x);
+        maxX = Math.max(maxX, x);
+        minY = Math.min(minY, y);
+        maxY = Math.max(maxY, y);
+      }
+      for (const primitive of visiblePrimitives) {
+        if (primitive.type === "circle") {
+          const [x, y] = primitive.center;
+          includePoint(x - primitive.radius, y - primitive.radius);
+          includePoint(x + primitive.radius, y + primitive.radius);
+        } else {
+          for (const point of primitive.points) includePoint(point[0], point[1]);
+        }
+      }
+      const span = Math.max(maxX - minX, maxY - minY, 1);
+      const padding = span * 0.06;
+      const svg = document.createElementNS(svgNamespace, "svg");
+      svg.setAttribute("viewBox", `${minX - padding} ${-maxY - padding} ${maxX - minX + padding * 2 || 1} ${maxY - minY + padding * 2 || 1}`);
+      svg.setAttribute("preserveAspectRatio", "xMidYMid meet");
+      const layerIndexes = new Map(resultLayers(visiblePrimitives).map((layer, index) => [layer, index]));
+      let remainingPathPoints = 100000;
+
+      for (const primitive of visiblePrimitives) {
+        const color = layerColors[(layerIndexes.get(primitive.layer) || 0) % layerColors.length];
+        let shape;
+        if (primitive.type === "circle") {
+          shape = document.createElementNS(svgNamespace, "circle");
+          shape.setAttribute("cx", String(primitive.center[0]));
+          shape.setAttribute("cy", String(-primitive.center[1]));
+          shape.setAttribute("r", String(primitive.radius));
+        } else {
+          shape = document.createElementNS(svgNamespace, "path");
+          const stride = Math.max(1, Math.ceil(primitive.points.length / Math.max(remainingPathPoints, 1)));
+          const coordinates = primitive.points
+            .filter((_, index) => index % stride === 0 || index === primitive.points.length - 1)
+            .map((point) => `${point[0]},${-point[1]}`);
+          remainingPathPoints -= coordinates.length;
+          const closed = primitive.type === "polyline" && primitive.closed;
+          shape.setAttribute("d", `M${coordinates.join(" L")}${closed ? " Z" : ""}`);
+          shape.setAttribute("fill", "none");
+        }
+        shape.setAttribute("stroke", color);
+        shape.setAttribute("stroke-width", String(span / 700));
+        shape.setAttribute("stroke-linecap", "round");
+        shape.setAttribute("stroke-linejoin", "round");
+        svg.append(shape);
+      }
+      preview.append(svg);
+      if (primitives.length > visiblePrimitives.length) {
+        const note = document.createElement("p");
+        note.className = "drawing-empty";
+        note.textContent = `미리보기는 처음 ${visiblePrimitives.length.toLocaleString()}개 객체까지 표시합니다.`;
+        preview.append(note);
+      }
+    }
+
+    function resultLayers(primitives) {
+      return [...new Set(primitives.map((primitive) => primitive.layer))];
+    }
+  </script>
+</body>
+</html>
